@@ -46,7 +46,7 @@ int stream_read(int socketfd, char *buffer, int len)
     return len - remaining;
 }
 
-int stream_write(int socketfd, char *buffer, int len)
+int stream_write(int socketfd, void *buffer, int len)
 {
     int nwrite;
     int remaining = len;
