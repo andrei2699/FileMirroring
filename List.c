@@ -1,18 +1,17 @@
 #include "List.h"
 #include <string.h>
 
-void InitList(ListNode_t *head, char *value)
+void InitList(ListNode_t *head)
 {
-    if(strcmp(value, "") == 0) return;
-    head->value = (char *) malloc(sizeof(char) * strlen(value));
-    strcpy(head->value, value);
+    head->value = (char *) malloc(sizeof(char));
+    strcpy(head->value, "*");
     head->next = NULL;
 }
 
 void ListAdd(ListNode_t *head, char *value)
 {
     if(strcmp(value, "") == 0) return;
-    
+
     ListNode_t * current = head;
     while (current->next != NULL) {
         current = current->next;
@@ -29,11 +28,25 @@ void ListPrint(ListNode_t *head)
     ListNode_t *current = head;
 
     while (current != NULL) {
-        printf("%s\n", current->value);
+        if (strcmp(current->value, "*") != 0)
+            printf("%s\n", current->value);
         current = current->next;
     }
 }
 
+int ListSearch(ListNode_t *head, char *value)
+{
+    ListNode_t *current = head;
+    while (current != NULL) {
+        if (strcmp(current->value, value) == 0)
+            return 1;
+            
+        current = current->next;
+    }
+
+    return 0;
+}
+
 void ListRemove(ListNode_t *head, char *value);
-void ListSearch(ListNode_t *head);
+
 void FreeList(ListNode_t *head);

@@ -10,10 +10,10 @@ typedef struct _list_node
     struct _list_node *next;
 } ListNode_t;
 
-void InitList(ListNode_t *head, char *value);
+void InitList(ListNode_t *head);
 void ListAdd(ListNode_t *head, char *value);
 void ListRemove(ListNode_t *head, char *value);
-void ListSearch(ListNode_t *head);
+int ListSearch(ListNode_t *head, char *value);
 void ListPrint(ListNode_t *head);
 void FreeList(ListNode_t *head);
 

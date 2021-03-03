@@ -17,9 +17,11 @@
 #include <time.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <libgen.h>
 
 #include "utils.h"
 #include "FileMirroringOperations.h"
+#include "List.h"
 
 #define IP_ADDR_BUFF_SIZE 20
 #define READ_BLOCK_SIZE 4096
@@ -29,6 +31,8 @@ PathData_t data;
 
 int ValidateNumber(char str[]);
 int ValidateIpAddress(char *ipAddress);
+void ListFilesRecursively(ListNode_t *head, char name[100]);
+void CreateFile(char *path);
 
 int main(int argc, char *argv[])
 {
@@ -72,27 +76,112 @@ int main(int argc, char *argv[])
     set_addr(&remoteAddress, argv[1], 0, serverPort);
     error_check(connect(sockfd, (struct sockaddr *)&remoteAddress, sizeof(remoteAddress)), 8, "Connect client to server socket error\n");
 
+    // TODO : create path list
+	ListNode_t *head = (ListNode_t *)malloc(sizeof(ListNode_t));
+	InitList(head);
+	ListFilesRecursively(head, argv[3]);
+	ListPrint(head);
+
     do
     {
         char cmd = FMO_SEND_NEXT_PATH;
         write(sockfd, &cmd, sizeof(char));
-
         recv(sockfd, &data, sizeof(PathData_t), 0);
-        printf("%s %d\n", data.path, data.fileType);
 
-        // TODO 1 : check if path exists
-            // if it does: go to TODO 2
-            // else: create file nad ask for file content
+		//printf("%s %d\n", data.path, i);
+        if (strcmp(data.path, "") != 0) {
+        	if (ListSearch(head, data.path))
+			{
+				struct stat fileStat;
+				error_check(lstat(data.path, &fileStat), 9, "Lstat error for given path\n");
+				if (fileStat.st_mtime != data.lastModifiedTime) 
+				{
+					// cerem continut
+				}
+			} else {
+				CreateFile(data.path);
+		    
+				FILE *fp;
+				fp  = fopen (data.path, "w");
+				if(!fp) {
+					printf("File open error\n");
+					exit(10);
+				}
+				
+			}
 
-        // TODO 2 : check the date of last modification on the file and compare it to the copy on the client computer
-            // if == move on
-            // else: ask for file content and overwrite the content of the file
+	        // TODO 1 : check if path exists
+	            // if it does: go to TODO 2
+	            // else: create file nad ask for file content
 
-    } while(strcmp(data.path, "") != 0);
+	        // TODO 2 : check the date of last modification on the file and compare it to the copy on the client computer
+	            // if == move on
+	            // else: ask for file content and overwrite the content of the file
+		} else break;
+		
+
+	} while(1);
 
 }
 
-int ValidateNumber(char str[]) {
+void CreateFile(char *dataPath)
+{
+	char * file = basename(data.path);
+    char * dir = (char *) malloc(sizeof(char) * MAX_PATH_SIZE);//dirname(data.path);
+    strcpy(dir, data.path);
+    dir[strlen(dir)-strlen(file)-1] = '\0';
+
+    printf("%s - %s - %s\n", data.path, dir, file);
+
+    char mkdirCmd[ 80 ] = { 0 };
+    strcat( mkdirCmd, "mkdir -p " );
+    strcat( mkdirCmd, dir );
+
+    char touchCmd[ 80 ] = { 0 };
+    strcat( touchCmd, "touch " );
+    strcat( touchCmd, dir );
+    strcat( touchCmd, "/" );
+    strcat( touchCmd, file );
+
+    system( mkdirCmd );
+	system( touchCmd );
+}
+
+void ListFilesRecursively(ListNode_t *head, char *basePath)
+{
+    char path[1000];
+    struct dirent *dp;
+    DIR *dir = opendir(basePath);
+
+    // Unable to open directory stream
+    if (!dir) return;
+
+    while ((dp = readdir(dir)) != NULL)
+    {
+		if (dp->d_type != DT_DIR) {
+			strcpy(path, basePath);
+            strcat(path, "/");
+            strcat(path, dp->d_name);
+			ListAdd(head, path);
+		}
+	
+        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
+        {
+            // printf("%s/%s\n", basePath, dp->d_name);
+            // Construct new path from our base path
+            strcpy(path, basePath);
+            strcat(path, "/");
+            strcat(path, dp->d_name);
+
+			ListFilesRecursively(head, path);
+        }
+    }
+
+    closedir(dir);
+}
+
+int ValidateNumber(char str[])
+{
 	
 	int i;
 	int len=strlen(str);
