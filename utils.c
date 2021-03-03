@@ -28,7 +28,7 @@ int set_addr(struct sockaddr_in *addr, char *name, uint32_t inaddr, short sin_po
     return 0;
 }
 
-int stream_read(int socketfd, char *buffer, int len)
+int stream_read(int socketfd, void *buffer, int len)
 {
     int nread;
     int remaining = len;
