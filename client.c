@@ -58,6 +58,38 @@ int main(int argc, char *argv[])
 		printf("The given path should correspond to a folder\n");
 		exit(5);
 	}
+
+    int sockfd;
+	short serverPort = (short) atoi(argv[2]);
+    struct sockaddr_in localAddress, remoteAddress;
+
+    sockfd = socket (PF_INET, SOCK_STREAM, 0);
+	error_check(sockfd, 6, "Create client socket error\n");
+
+    set_addr(&localAddress, NULL, INADDR_ANY, 0);
+    error_check(bind(sockfd, (struct sockaddr *)&localAddress, sizeof(localAddress)), 7, "Bind client socket error\n");
+
+    set_addr(&remoteAddress, argv[1], 0, serverPort);
+    error_check(connect(sockfd, (struct sockaddr *)&remoteAddress, sizeof(remoteAddress)), 8, "Connect client to server socket error\n");
+
+    do
+    {
+        char cmd = FMO_SEND_NEXT_PATH;
+        write(sockfd, &cmd, sizeof(char));
+
+        recv(sockfd, &data, sizeof(PathData_t), 0);
+        printf("%s %d\n", data.path, data.fileType);
+
+        // TODO 1 : check if path exists
+            // if it does: go to TODO 2
+            // else: create file nad ask for file content
+
+        // TODO 2 : check the date of last modification on the file and compare it to the copy on the client computer
+            // if == move on
+            // else: ask for file content and overwrite the content of the file
+
+    } while(strcmp(data.path, "") != 0);
+
 }
 
 int ValidateNumber(char str[]) {
