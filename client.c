@@ -33,6 +33,7 @@ int ValidateNumber(char str[]);
 int ValidateIpAddress(char *ipAddress);
 void ListFilesRecursively(ListNode_t *head, char name[100]);
 void CreateFile(char *path);
+void WriteToFile(int fd, int sockfd);
 
 int main(int argc, char *argv[])
 {
@@ -82,9 +83,11 @@ int main(int argc, char *argv[])
 	ListFilesRecursively(head, argv[3]);
 	ListPrint(head);
 
+	char cmd;
+
     do
     {
-        char cmd = FMO_SEND_NEXT_PATH;
+        cmd = FMO_SEND_NEXT_PATH;
         write(sockfd, &cmd, sizeof(char));
         recv(sockfd, &data, sizeof(PathData_t), 0);
 
@@ -94,34 +97,53 @@ int main(int argc, char *argv[])
 			{
 				struct stat fileStat;
 				error_check(lstat(data.path, &fileStat), 9, "Lstat error for given path\n");
+
 				if (fileStat.st_mtime != data.lastModifiedTime) 
 				{
-					// cerem continut
+					int fd = open(data.path, O_WRONLY);
+					error_check(fd, 4, "Open File Error\n");
+					
+					WriteToFile(fd, sockfd);
 				}
-			} else {
+			} 
+			else 
+			{
 				CreateFile(data.path);
 		    
-				FILE *fp;
-				fp  = fopen (data.path, "w");
-				if(!fp) {
-					printf("File open error\n");
-					exit(10);
-				}
-				
+				int fd = open(data.path, O_WRONLY);
+				error_check(fd, 4, "Open File Error\n");				
+
+				WriteToFile(fd, sockfd);
 			}
-
-	        // TODO 1 : check if path exists
-	            // if it does: go to TODO 2
-	            // else: create file nad ask for file content
-
-	        // TODO 2 : check the date of last modification on the file and compare it to the copy on the client computer
-	            // if == move on
-	            // else: ask for file content and overwrite the content of the file
 		} else break;
-		
 
 	} while(1);
 
+	// TODO Check remaining paths in List
+
+}
+
+void WriteToFile(int fd, int sockfd)
+{
+	char cmd = FMO_SEND_LAST_PATH_FILE_CONTENT;
+	write(sockfd, &cmd, sizeof(char));
+	int nread = -1;
+	char buffer[4096];
+	do
+	{
+		int size = 0;
+		nread = stream_read(sockfd, &size, sizeof(size));
+		error_check(nread, 10, "Steram Read Error\n");
+		if (size == 0)
+		{
+			break;
+		}
+
+		nread = stream_read(sockfd, buffer, size);
+		error_check(nread, 10, "Steram Read Error\n");
+
+		write(fd, buffer, nread);
+	} while (nread > 0);
 }
 
 void CreateFile(char *dataPath)
