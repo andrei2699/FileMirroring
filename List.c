@@ -47,6 +47,41 @@ int ListSearch(ListNode_t *head, char *value)
     return 0;
 }
 
-void ListRemove(ListNode_t *head, char *value);
+int ListRemove(ListNode_t *head, char *value)
+{
+    ListNode_t *current = head, *prev;
+    while (current != NULL && current->value != value) {
+        prev = current;
+        current = current->next;
+    }
 
-void FreeList(ListNode_t *head);
+    if (current == NULL)
+        return -1;
+
+    prev->next = current->next;
+    free(current);
+
+    return 1;
+}
+
+ListNode_t *GetItem(ListNode_t *head)
+{
+    return head->next;
+}
+
+int ListIsEmpty(ListNode_t *head) 
+{
+    return head->next == NULL;
+}
+
+void FreeList(ListNode_t *head)
+{
+    if (ListIsEmpty(head))
+    {
+        free(head);
+    }
+    else
+    {
+        printf("List is not empty\n");
+    }
+}
