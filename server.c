@@ -210,6 +210,7 @@ void ResponseToChildEnd(int sig)
 
 void NewConnection(int serverSocket, int clientSocket, char path[])
 {
+    int rootFolderNameIndexOffset = strlen(path);
     char charBuffer;
     int nread;
 
@@ -229,6 +230,7 @@ void NewConnection(int serverSocket, int clientSocket, char path[])
             {
                 PathData_t data;
                 GetNextFilePath(&data);
+                strcpy(data.path, data.path + rootFolderNameIndexOffset);
                 stream_write(clientSocket, &data, sizeof(PathData_t));
             }
             break;
