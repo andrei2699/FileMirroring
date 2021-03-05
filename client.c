@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 	ListNode_t *head = (ListNode_t *)malloc(sizeof(ListNode_t));
 	InitList(head);
 	ListFilesRecursively(head, argv[3]);
-	ListPrint(head);
+	//ListPrint(head);
 
 	char cmd;
 
@@ -98,29 +98,55 @@ int main(int argc, char *argv[])
 				struct stat fileStat;
 				error_check(lstat(data.path, &fileStat), 9, "Lstat error for given path\n");
 
-				if (fileStat.st_mtime != data.lastModifiedTime) 
+				if (!S_ISDIR(fileStat.st_mode))
 				{
-					int fd = open(data.path, O_WRONLY);
-					error_check(fd, 4, "Open File Error\n");
+					if (fileStat.st_mtime != data.lastModifiedTime) 
+					{
+						int fd = open(data.path, O_WRONLY);
+						error_check(fd, 4, "Open File Error\n");
 					
-					WriteToFile(fd, sockfd);
+						WriteToFile(fd, sockfd);
+					}
 				}
+
+
+				if(ListRemove(head, data.path))
+				{
+					printf("Removed success\n");
+				}
+				ListPrint(head);
 			} 
 			else 
 			{
 				CreateFile(data.path);
 		    
-				int fd = open(data.path, O_WRONLY);
-				error_check(fd, 4, "Open File Error\n");				
+				struct stat fileStat;
+				error_check(lstat(data.path, &fileStat), 11, "Lstat in traversal Error\n");
 
-				WriteToFile(fd, sockfd);
+				if (!S_ISDIR(fileStat.st_mode))
+				{
+					int fd = open(data.path, O_WRONLY);
+					error_check(fd, 4, "Open File Error\n");				
+
+					WriteToFile(fd, sockfd);
+				}
 			}
+
 		} else break;
 
 	} while(1);
 
-	// TODO Check remaining paths in List
+	while(!ListIsEmpty(head))
+	{
+		// Start deleting
+		ListNode_t *nodeToDelete = GetItem(head);
+		printf("%s\n", nodeToDelete->value);
+		remove(nodeToDelete->value);
+		ListRemove(head, nodeToDelete->value);
+	}
 
+	FreeList(head);
+	printf("Folder is up to date\n");
 }
 
 void WriteToFile(int fd, int sockfd)
@@ -149,11 +175,11 @@ void WriteToFile(int fd, int sockfd)
 void CreateFile(char *dataPath)
 {
 	char * file = basename(data.path);
-    char * dir = (char *) malloc(sizeof(char) * MAX_PATH_SIZE);//dirname(data.path);
+    char * dir = (char *) malloc(sizeof(char) * MAX_PATH_SIZE);
     strcpy(dir, data.path);
     dir[strlen(dir)-strlen(file)-1] = '\0';
 
-    printf("%s - %s - %s\n", data.path, dir, file);
+    // printf("%s - %s - %s\n", data.path, dir, file);
 
     char mkdirCmd[ 80 ] = { 0 };
     strcat( mkdirCmd, "mkdir -p " );
@@ -180,7 +206,8 @@ void ListFilesRecursively(ListNode_t *head, char *basePath)
 
     while ((dp = readdir(dir)) != NULL)
     {
-		if (dp->d_type != DT_DIR) {
+		if (dp->d_type != DT_DIR)
+		{
 			strcpy(path, basePath);
             strcat(path, "/");
             strcat(path, dp->d_name);
@@ -190,7 +217,6 @@ void ListFilesRecursively(ListNode_t *head, char *basePath)
         if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
         {
             // printf("%s/%s\n", basePath, dp->d_name);
-            // Construct new path from our base path
             strcpy(path, basePath);
             strcat(path, "/");
             strcat(path, dp->d_name);
@@ -201,7 +227,6 @@ void ListFilesRecursively(ListNode_t *head, char *basePath)
 
     closedir(dir);
 }
-
 int ValidateNumber(char str[])
 {
 	
