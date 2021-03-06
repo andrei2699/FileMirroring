@@ -230,7 +230,10 @@ void NewConnection(int serverSocket, int clientSocket, char path[])
             {
                 PathData_t data;
                 GetNextFilePath(&data);
-                strcpy(data.path, data.path + rootFolderNameIndexOffset);
+                if (strlen(data.path) > 0)
+                {
+                    strcpy(data.path, data.path + rootFolderNameIndexOffset);
+                }
                 stream_write(clientSocket, &data, sizeof(PathData_t));
             }
             break;
