@@ -11,6 +11,7 @@ void InitList(ListNode_t *head)
 void ListAdd(ListNode_t *head, char *value)
 {
     if(strcmp(value, "") == 0) return;
+    if(ListSearch(head, value)) return;
 
     ListNode_t * current = head;
     while (current->next != NULL) {
@@ -50,7 +51,7 @@ int ListSearch(ListNode_t *head, char *value)
 int ListRemove(ListNode_t *head, char *value)
 {
     ListNode_t *current = head, *prev;
-    while (current != NULL && current->value != value) {
+    while (current != NULL && strcmp(current->value, value) != 0) {
         prev = current;
         current = current->next;
     }

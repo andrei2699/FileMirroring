@@ -32,7 +32,8 @@ PathData_t data;
 int ValidateNumber(char str[]);
 int ValidateIpAddress(char *ipAddress);
 void ListFilesRecursively(ListNode_t *head, char name[100]);
-void CreateFile(char *path);
+void CreateFile(char *dataPath);
+void CreateFolder(char *dataPath);
 void WriteToFile(int fd, int sockfd);
 
 int main(int argc, char *argv[])
@@ -81,7 +82,7 @@ int main(int argc, char *argv[])
 	ListNode_t *head = (ListNode_t *)malloc(sizeof(ListNode_t));
 	InitList(head);
 	ListFilesRecursively(head, argv[3]);
-	//ListPrint(head);
+	ListPrint(head);
 
 	char cmd;
 	char rootDir[MAX_PATH_SIZE];
@@ -96,7 +97,7 @@ int main(int argc, char *argv[])
         	strcpy(rootDir, argv[3]);
 			strcat(rootDir, data.path);
 			strcpy(data.path, rootDir);
-			printf("%s\n", data.path);
+			//printf("%s\n", data.path);
 			
         	if (ListSearch(head, data.path))
 			{
@@ -123,8 +124,15 @@ int main(int argc, char *argv[])
 			} 
 			else 
 			{
-				CreateFile(data.path);
-		    
+				if(data.fileType == FT_FOLDER)
+				{
+					CreateFolder(data.path);
+				}
+				else 
+				{
+					CreateFile(data.path);
+				}
+				
 				struct stat fileStat;
 				error_check(lstat(data.path, &fileStat), 11, "Lstat in traversal Error\n");
 
@@ -141,12 +149,26 @@ int main(int argc, char *argv[])
 
 	} while(1);
 
+	// ListPrint(head);
+
 	while(!ListIsEmpty(head))
 	{
 		// Start deleting
 		ListNode_t *nodeToDelete = GetItem(head);
-		printf("%s\n", nodeToDelete->value);
-		remove(nodeToDelete->value);
+		// printf("%s\n", nodeToDelete->value);
+		struct stat fileStat;
+		error_check(lstat(nodeToDelete->value, &fileStat), 9, "Lstat error for given path\n");
+		if (!S_ISDIR(fileStat.st_mode))
+		{
+			remove(nodeToDelete->value);
+		}
+		else
+		{
+			printf("DIR: %s\n", nodeToDelete->value);
+			rmdir(nodeToDelete->value);
+		}
+
+		
 		ListRemove(head, nodeToDelete->value);
 	}
 
@@ -177,6 +199,15 @@ void WriteToFile(int fd, int sockfd)
 	} while (nread > 0);
 }
 
+void CreateFolder(char *dataPath)
+{
+	char mkdirCmd[80] = {0};
+    strcat(mkdirCmd, "mkdir -p ");
+    strcat(mkdirCmd, dataPath);
+
+	system(mkdirCmd);
+}
+
 void CreateFile(char *dataPath)
 {
 	char * file = basename(dataPath);
@@ -186,18 +217,18 @@ void CreateFile(char *dataPath)
 
     // printf("%s - %s - %s\n", dataPath, dir, file);
 
-    char mkdirCmd[ 80 ] = { 0 };
-    strcat( mkdirCmd, "mkdir -p " );
-    strcat( mkdirCmd, dir );
+    char mkdirCmd[80] = {0};
+    strcat(mkdirCmd, "mkdir -p ");
+    strcat(mkdirCmd, dir);
 
-    char touchCmd[ 80 ] = { 0 };
-    strcat( touchCmd, "touch " );
-    strcat( touchCmd, dir );
-    strcat( touchCmd, "/" );
-    strcat( touchCmd, file );
+    char touchCmd[80] = {0};
+    strcat(touchCmd, "touch ");
+    strcat(touchCmd, dir);
+    strcat(touchCmd, "/");
+    strcat(touchCmd, file);
 
-    system( mkdirCmd );
-	system( touchCmd );
+    system(mkdirCmd);
+	system(touchCmd);
 }
 
 void ListFilesRecursively(ListNode_t *head, char *basePath)
@@ -205,30 +236,36 @@ void ListFilesRecursively(ListNode_t *head, char *basePath)
     char path[1000];
     struct dirent *dp;
     DIR *dir = opendir(basePath);
+    int empty = 1;
 
     // Unable to open directory stream
     if (!dir) return;
 
-    while ((dp = readdir(dir)) != NULL)
-    {
-		if (dp->d_type != DT_DIR)
-		{
+	while ((dp = readdir(dir)) != NULL) {
+		
+        if (dp->d_type == DT_DIR) {
+            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+                continue;
+			empty = 0;
 			strcpy(path, basePath);
-            strcat(path, "/");
-            strcat(path, dp->d_name);
+			strcat(path, "/");
+			strcat(path, dp->d_name);
+            ListFilesRecursively(head, path);
+        } 
+		else 
+		{
+			empty = 0;
+            strcpy(path, basePath);
+			strcat(path, "/");
+			strcat(path, dp->d_name);
 			ListAdd(head, path);
 		}
-	
-        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
-        {
-            // printf("%s/%s\n", basePath, dp->d_name);
-            strcpy(path, basePath);
-            strcat(path, "/");
-            strcat(path, dp->d_name);
-
-			ListFilesRecursively(head, path);
-        }
     }
+
+	if(empty)
+	{
+		ListAdd(head, basePath);
+	}
 
     closedir(dir);
 }
