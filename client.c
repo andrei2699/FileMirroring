@@ -92,12 +92,12 @@ int main(int argc, char *argv[])
         write(sockfd, &cmd, sizeof(char));
         recv(sockfd, &data, sizeof(PathData_t), 0);
 
-		strcpy(rootDir, argv[3]);
-		strcat(rootDir, data.path);
-		strcpy(data.path, rootDir);
-
-		printf("%s\n", data.path);
         if (strcmp(data.path, "") != 0) {
+        	strcpy(rootDir, argv[3]);
+			strcat(rootDir, data.path);
+			strcpy(data.path, rootDir);
+			printf("%s\n", data.path);
+			
         	if (ListSearch(head, data.path))
 			{
 				struct stat fileStat;
