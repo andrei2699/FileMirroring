@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
 	//ListPrint(head);
 
 	char cmd;
+	char rootDir[MAX_PATH_SIZE];
 
     do
     {
@@ -91,7 +92,11 @@ int main(int argc, char *argv[])
         write(sockfd, &cmd, sizeof(char));
         recv(sockfd, &data, sizeof(PathData_t), 0);
 
-		//printf("%s %d\n", data.path, i);
+		strcpy(rootDir, argv[3]);
+		strcat(rootDir, data.path);
+		strcpy(data.path, rootDir);
+
+		printf("%s\n", data.path);
         if (strcmp(data.path, "") != 0) {
         	if (ListSearch(head, data.path))
 			{
@@ -174,12 +179,12 @@ void WriteToFile(int fd, int sockfd)
 
 void CreateFile(char *dataPath)
 {
-	char * file = basename(data.path);
+	char * file = basename(dataPath);
     char * dir = (char *) malloc(sizeof(char) * MAX_PATH_SIZE);
-    strcpy(dir, data.path);
+    strcpy(dir, dataPath);
     dir[strlen(dir)-strlen(file)-1] = '\0';
 
-    // printf("%s - %s - %s\n", data.path, dir, file);
+    // printf("%s - %s - %s\n", dataPath, dir, file);
 
     char mkdirCmd[ 80 ] = { 0 };
     strcat( mkdirCmd, "mkdir -p " );
