@@ -35,6 +35,7 @@ void ListFilesRecursively(ListNode_t *head, char name[100]);
 void CreateFile(char *dataPath);
 void CreateFolder(char *dataPath);
 void WriteToFile(int fd, int sockfd);
+int LastSlashIndex(char *str);
 
 int main(int argc, char *argv[])
 {
@@ -69,7 +70,7 @@ int main(int argc, char *argv[])
 	short serverPort = (short) atoi(argv[2]);
     struct sockaddr_in localAddress, remoteAddress;
 
-    sockfd = socket (PF_INET, SOCK_STREAM, 0);
+    sockfd = socket (PF_INET, SOCK_STREAM, 0); 
 	error_check(sockfd, 6, "Create client socket error\n");
 
     set_addr(&localAddress, NULL, INADDR_ANY, 0);
@@ -79,10 +80,14 @@ int main(int argc, char *argv[])
     error_check(connect(sockfd, (struct sockaddr *)&remoteAddress, sizeof(remoteAddress)), 8, "Connect client to server socket error\n");
 
     // TODO : create path list
+
+	ListNode_t *headServer = (ListNode_t *)malloc(sizeof(ListNode_t));
+	InitList(headServer);
+
 	ListNode_t *head = (ListNode_t *)malloc(sizeof(ListNode_t));
 	InitList(head);
 	ListFilesRecursively(head, argv[3]);
-	ListPrint(head);
+	// ListPrint(head);
 
 	char cmd;
 	char rootDir[MAX_PATH_SIZE];
@@ -94,11 +99,13 @@ int main(int argc, char *argv[])
         recv(sockfd, &data, sizeof(PathData_t), 0);
 
         if (strcmp(data.path, "") != 0) {
+			sleep(5);
         	strcpy(rootDir, argv[3]);
 			strcat(rootDir, data.path);
 			strcpy(data.path, rootDir);
-			//printf("%s\n", data.path);
-			
+			ListAdd(headServer, data.path);
+			// printf("%s\n", data.path);
+
         	if (ListSearch(head, data.path))
 			{
 				struct stat fileStat;
@@ -115,15 +122,13 @@ int main(int argc, char *argv[])
 					}
 				}
 
+				printf("%s\n", data.path);
 
-				if(ListRemove(head, data.path))
-				{
-					printf("Removed success\n");
-				}
-				ListPrint(head);
+				ListRemove(head, data.path);
 			} 
 			else 
 			{
+			
 				if(data.fileType == FT_FOLDER)
 				{
 					CreateFolder(data.path);
@@ -149,29 +154,41 @@ int main(int argc, char *argv[])
 
 	} while(1);
 
-	// ListPrint(head);
-
 	while(!ListIsEmpty(head))
 	{
 		// Start deleting
 		ListNode_t *nodeToDelete = GetItem(head);
 		// printf("%s\n", nodeToDelete->value);
-		struct stat fileStat;
-		error_check(lstat(nodeToDelete->value, &fileStat), 9, "Lstat error for given path\n");
-		if (!S_ISDIR(fileStat.st_mode))
-		{
-			remove(nodeToDelete->value);
-		}
-		else
-		{
-			printf("DIR: %s\n", nodeToDelete->value);
-			rmdir(nodeToDelete->value);
-		}
-
-		
+		char pathToDelete[MAX_PATH_SIZE];
+		strcpy(pathToDelete, nodeToDelete->value);
 		ListRemove(head, nodeToDelete->value);
+
+		do 
+		{
+			int lastIndex = LastSlashIndex(pathToDelete);
+			if (lastIndex == -1) {
+				break;
+			}
+
+			struct stat fileStat;
+			error_check(lstat(pathToDelete, &fileStat), 9, "Lstat error for given path\n");
+			if (!S_ISDIR(fileStat.st_mode))
+			{
+				remove(pathToDelete);
+			}
+			else
+			{
+				printf("DIR: %s\n", pathToDelete);
+				rmdir(pathToDelete);
+			}
+
+			pathToDelete[lastIndex] = '\0';
+
+		} while(!ListSearch(headServer, pathToDelete));
 	}
 
+
+	FreeList(headServer);
 	FreeList(head);
 	printf("Folder is up to date\n");
 }
@@ -181,7 +198,7 @@ void WriteToFile(int fd, int sockfd)
 	char cmd = FMO_SEND_LAST_PATH_FILE_CONTENT;
 	write(sockfd, &cmd, sizeof(char));
 	int nread = -1;
-	char buffer[4096];
+	char buffer[READ_BLOCK_SIZE];
 	do
 	{
 		int size = 0;
@@ -197,11 +214,12 @@ void WriteToFile(int fd, int sockfd)
 
 		write(fd, buffer, nread);
 	} while (nread > 0);
+
 }
 
 void CreateFolder(char *dataPath)
 {
-	char mkdirCmd[80] = {0};
+	char mkdirCmd[MAX_PATH_SIZE] = {0};
     strcat(mkdirCmd, "mkdir -p ");
     strcat(mkdirCmd, dataPath);
 
@@ -211,17 +229,18 @@ void CreateFolder(char *dataPath)
 void CreateFile(char *dataPath)
 {
 	char * file = basename(dataPath);
-    char * dir = (char *) malloc(sizeof(char) * MAX_PATH_SIZE);
+	printf("%s\n", file);
+    char dir[MAX_PATH_SIZE];
     strcpy(dir, dataPath);
     dir[strlen(dir)-strlen(file)-1] = '\0';
 
-    // printf("%s - %s - %s\n", dataPath, dir, file);
+    printf("%s - %s - %s\n", dataPath, dir, file);
 
-    char mkdirCmd[80] = {0};
+    char mkdirCmd[MAX_PATH_SIZE] = {0};
     strcat(mkdirCmd, "mkdir -p ");
     strcat(mkdirCmd, dir);
 
-    char touchCmd[80] = {0};
+    char touchCmd[MAX_PATH_SIZE] = {0};
     strcat(touchCmd, "touch ");
     strcat(touchCmd, dir);
     strcat(touchCmd, "/");
@@ -338,4 +357,17 @@ int ValidateIpAddress(char *ipAddress)
    }
    
    return 1;
+}
+
+int LastSlashIndex(char *str)
+{
+    for (int i = strlen(str) - 1; i >= 0; i--)
+    {
+        if (str[i] == '/')
+        {
+            return i;
+        }
+    }
+
+    return -1;
 }
