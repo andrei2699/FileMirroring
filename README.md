@@ -52,3 +52,19 @@ dir
   fise.txt
 ```
   
+#### Compilare
+```sh
+cd build
+gcc -Wall -o build build.c  
+./build build.txt
+```
+
+#### Rulare
+##### Server
+```sh
+./server <ip_address> <port> <director_server>
+```
+##### Client
+```sh
+./client <ip_address> <port> <director_client>
+```
