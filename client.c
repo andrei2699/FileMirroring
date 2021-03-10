@@ -163,10 +163,11 @@ int main(int argc, char *argv[])
 
 	while(!ListIsEmpty(head))
 	{
+		sleep(5);
 		// Start deleting
 		ListNode_t *nodeToDelete = GetItem(head);
 		if(strcmp(nodeToDelete->value, argv[3]) == 0) break;
-		
+
 		printf("Path in client folder but not on the server: %s\n", nodeToDelete->value);
 		char pathToDelete[MAX_PATH_SIZE];
 		strcpy(pathToDelete, nodeToDelete->value);
