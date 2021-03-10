@@ -98,16 +98,22 @@ int main(int argc, char *argv[])
         write(sockfd, &cmd, sizeof(char));
         recv(sockfd, &data, sizeof(PathData_t), 0);
 
-        if (strcmp(data.path, "") != 0) {
+        if (strcmp(data.path, "") != 0) 
+		{
 			sleep(5);
+			printf("Path from the server: %s\n", data.path);
+
         	strcpy(rootDir, argv[3]);
 			strcat(rootDir, data.path);
 			strcpy(data.path, rootDir);
 			ListAdd(headServer, data.path);
-			// printf("%s\n", data.path);
+
+			printf("Path added to the paths recieved from the server: %s\n", data.path);
 
         	if (ListSearch(head, data.path))
 			{
+				printf("This path exists in the client folder, so update it if needed\n");
+				
 				struct stat fileStat;
 				error_check(lstat(data.path, &fileStat), 9, "Lstat error for given path\n");
 
@@ -116,18 +122,17 @@ int main(int argc, char *argv[])
 					if (fileStat.st_mtime != data.lastModifiedTime) 
 					{
 						int fd = open(data.path, O_WRONLY);
-						error_check(fd, 4, "Open File Error\n");
+						error_check(fd, 10, "Open File Error\n");
 					
 						WriteToFile(fd, sockfd);
 					}
 				}
 
-				printf("%s\n", data.path);
-
 				ListRemove(head, data.path);
 			} 
 			else 
 			{
+				printf("This path does not exist in the client folder, so create it and update it\n");
 			
 				if(data.fileType == FT_FOLDER)
 				{
@@ -144,7 +149,7 @@ int main(int argc, char *argv[])
 				if (!S_ISDIR(fileStat.st_mode))
 				{
 					int fd = open(data.path, O_WRONLY);
-					error_check(fd, 4, "Open File Error\n");				
+					error_check(fd, 12, "Open File Error\n");				
 
 					WriteToFile(fd, sockfd);
 				}
@@ -154,11 +159,15 @@ int main(int argc, char *argv[])
 
 	} while(1);
 
+	printf("\nDone with server paths\n\n");
+
 	while(!ListIsEmpty(head))
 	{
 		// Start deleting
 		ListNode_t *nodeToDelete = GetItem(head);
-		// printf("%s\n", nodeToDelete->value);
+		if(strcmp(nodeToDelete->value, argv[3]) == 0) break;
+		
+		printf("Path in client folder but not on the server: %s\n", nodeToDelete->value);
 		char pathToDelete[MAX_PATH_SIZE];
 		strcpy(pathToDelete, nodeToDelete->value);
 		ListRemove(head, nodeToDelete->value);
@@ -171,14 +180,16 @@ int main(int argc, char *argv[])
 			}
 
 			struct stat fileStat;
-			error_check(lstat(pathToDelete, &fileStat), 9, "Lstat error for given path\n");
+			error_check(lstat(pathToDelete, &fileStat), 13, "Lstat error for given path\n");
+
 			if (!S_ISDIR(fileStat.st_mode))
 			{
+				printf("File to remove from client folder: %s\n", pathToDelete);
 				remove(pathToDelete);
 			}
 			else
 			{
-				printf("DIR: %s\n", pathToDelete);
+				printf("Directory to remove from client folder: %s\n", pathToDelete);
 				rmdir(pathToDelete);
 			}
 
@@ -203,14 +214,14 @@ void WriteToFile(int fd, int sockfd)
 	{
 		int size = 0;
 		nread = stream_read(sockfd, &size, sizeof(size));
-		error_check(nread, 10, "Steram Read Error\n");
+		error_check(nread, 14, "Steram Read Error\n");
 		if (size == 0)
 		{
 			break;
 		}
 
 		nread = stream_read(sockfd, buffer, size);
-		error_check(nread, 10, "Steram Read Error\n");
+		error_check(nread, 15, "Steram Read Error\n");
 
 		write(fd, buffer, nread);
 	} while (nread > 0);
@@ -229,12 +240,9 @@ void CreateFolder(char *dataPath)
 void CreateFile(char *dataPath)
 {
 	char * file = basename(dataPath);
-	printf("%s\n", file);
     char dir[MAX_PATH_SIZE];
     strcpy(dir, dataPath);
     dir[strlen(dir)-strlen(file)-1] = '\0';
-
-    printf("%s - %s - %s\n", dataPath, dir, file);
 
     char mkdirCmd[MAX_PATH_SIZE] = {0};
     strcat(mkdirCmd, "mkdir -p ");
