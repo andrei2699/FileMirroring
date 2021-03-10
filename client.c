@@ -32,8 +32,10 @@ PathData_t data;
 int ValidateNumber(char str[]);
 int ValidateIpAddress(char *ipAddress);
 void ListFilesRecursively(ListNode_t *head, char name[100]);
-void CreateFile(char *path);
+void CreateFile(char *dataPath);
+void CreateFolder(char *dataPath);
 void WriteToFile(int fd, int sockfd);
+int LastSlashIndex(char *str);
 
 int main(int argc, char *argv[])
 {
@@ -68,7 +70,7 @@ int main(int argc, char *argv[])
 	short serverPort = (short) atoi(argv[2]);
     struct sockaddr_in localAddress, remoteAddress;
 
-    sockfd = socket (PF_INET, SOCK_STREAM, 0);
+    sockfd = socket (PF_INET, SOCK_STREAM, 0); 
 	error_check(sockfd, 6, "Create client socket error\n");
 
     set_addr(&localAddress, NULL, INADDR_ANY, 0);
@@ -78,10 +80,14 @@ int main(int argc, char *argv[])
     error_check(connect(sockfd, (struct sockaddr *)&remoteAddress, sizeof(remoteAddress)), 8, "Connect client to server socket error\n");
 
     // TODO : create path list
+
+	ListNode_t *headServer = (ListNode_t *)malloc(sizeof(ListNode_t));
+	InitList(headServer);
+
 	ListNode_t *head = (ListNode_t *)malloc(sizeof(ListNode_t));
 	InitList(head);
 	ListFilesRecursively(head, argv[3]);
-	//ListPrint(head);
+	// ListPrint(head);
 
 	char cmd;
 	char rootDir[MAX_PATH_SIZE];
@@ -92,14 +98,22 @@ int main(int argc, char *argv[])
         write(sockfd, &cmd, sizeof(char));
         recv(sockfd, &data, sizeof(PathData_t), 0);
 
-        if (strcmp(data.path, "") != 0) {
+        if (strcmp(data.path, "") != 0) 
+		{
+			sleep(5);
+			printf("Path from the server: %s\n", data.path);
+
         	strcpy(rootDir, argv[3]);
 			strcat(rootDir, data.path);
 			strcpy(data.path, rootDir);
-			printf("%s\n", data.path);
-			
+			ListAdd(headServer, data.path);
+
+			printf("Path added to the paths recieved from the server: %s\n", data.path);
+
         	if (ListSearch(head, data.path))
 			{
+				printf("This path exists in the client folder, so update it if needed\n");
+				
 				struct stat fileStat;
 				error_check(lstat(data.path, &fileStat), 9, "Lstat error for given path\n");
 
@@ -108,30 +122,34 @@ int main(int argc, char *argv[])
 					if (fileStat.st_mtime != data.lastModifiedTime) 
 					{
 						int fd = open(data.path, O_WRONLY);
-						error_check(fd, 4, "Open File Error\n");
+						error_check(fd, 10, "Open File Error\n");
 					
 						WriteToFile(fd, sockfd);
 					}
 				}
 
-
-				if(ListRemove(head, data.path))
-				{
-					printf("Removed success\n");
-				}
-				ListPrint(head);
+				ListRemove(head, data.path);
 			} 
 			else 
 			{
-				CreateFile(data.path);
-		    
+				printf("This path does not exist in the client folder, so create it and update it\n");
+			
+				if(data.fileType == FT_FOLDER)
+				{
+					CreateFolder(data.path);
+				}
+				else 
+				{
+					CreateFile(data.path);
+				}
+				
 				struct stat fileStat;
 				error_check(lstat(data.path, &fileStat), 11, "Lstat in traversal Error\n");
 
 				if (!S_ISDIR(fileStat.st_mode))
 				{
 					int fd = open(data.path, O_WRONLY);
-					error_check(fd, 4, "Open File Error\n");				
+					error_check(fd, 12, "Open File Error\n");				
 
 					WriteToFile(fd, sockfd);
 				}
@@ -141,15 +159,48 @@ int main(int argc, char *argv[])
 
 	} while(1);
 
+	printf("\nDone with server paths\n\n");
+
 	while(!ListIsEmpty(head))
 	{
+		sleep(5);
 		// Start deleting
 		ListNode_t *nodeToDelete = GetItem(head);
-		printf("%s\n", nodeToDelete->value);
-		remove(nodeToDelete->value);
+		if(strcmp(nodeToDelete->value, argv[3]) == 0) break;
+
+		printf("Path in client folder but not on the server: %s\n", nodeToDelete->value);
+		char pathToDelete[MAX_PATH_SIZE];
+		strcpy(pathToDelete, nodeToDelete->value);
 		ListRemove(head, nodeToDelete->value);
+
+		do 
+		{
+			int lastIndex = LastSlashIndex(pathToDelete);
+			if (lastIndex == -1) {
+				break;
+			}
+
+			struct stat fileStat;
+			error_check(lstat(pathToDelete, &fileStat), 13, "Lstat error for given path\n");
+
+			if (!S_ISDIR(fileStat.st_mode))
+			{
+				printf("File to remove from client folder: %s\n", pathToDelete);
+				remove(pathToDelete);
+			}
+			else
+			{
+				printf("Directory to remove from client folder: %s\n", pathToDelete);
+				rmdir(pathToDelete);
+			}
+
+			pathToDelete[lastIndex] = '\0';
+
+		} while(!ListSearch(headServer, pathToDelete));
 	}
 
+
+	FreeList(headServer);
 	FreeList(head);
 	printf("Folder is up to date\n");
 }
@@ -159,45 +210,53 @@ void WriteToFile(int fd, int sockfd)
 	char cmd = FMO_SEND_LAST_PATH_FILE_CONTENT;
 	write(sockfd, &cmd, sizeof(char));
 	int nread = -1;
-	char buffer[4096];
+	char buffer[READ_BLOCK_SIZE];
 	do
 	{
 		int size = 0;
 		nread = stream_read(sockfd, &size, sizeof(size));
-		error_check(nread, 10, "Steram Read Error\n");
+		error_check(nread, 14, "Steram Read Error\n");
 		if (size == 0)
 		{
 			break;
 		}
 
 		nread = stream_read(sockfd, buffer, size);
-		error_check(nread, 10, "Steram Read Error\n");
+		error_check(nread, 15, "Steram Read Error\n");
 
 		write(fd, buffer, nread);
 	} while (nread > 0);
+
+}
+
+void CreateFolder(char *dataPath)
+{
+	char mkdirCmd[MAX_PATH_SIZE] = {0};
+    strcat(mkdirCmd, "mkdir -p ");
+    strcat(mkdirCmd, dataPath);
+
+	system(mkdirCmd);
 }
 
 void CreateFile(char *dataPath)
 {
 	char * file = basename(dataPath);
-    char * dir = (char *) malloc(sizeof(char) * MAX_PATH_SIZE);
+    char dir[MAX_PATH_SIZE];
     strcpy(dir, dataPath);
     dir[strlen(dir)-strlen(file)-1] = '\0';
 
-    // printf("%s - %s - %s\n", dataPath, dir, file);
+    char mkdirCmd[MAX_PATH_SIZE] = {0};
+    strcat(mkdirCmd, "mkdir -p ");
+    strcat(mkdirCmd, dir);
 
-    char mkdirCmd[ 80 ] = { 0 };
-    strcat( mkdirCmd, "mkdir -p " );
-    strcat( mkdirCmd, dir );
+    char touchCmd[MAX_PATH_SIZE] = {0};
+    strcat(touchCmd, "touch ");
+    strcat(touchCmd, dir);
+    strcat(touchCmd, "/");
+    strcat(touchCmd, file);
 
-    char touchCmd[ 80 ] = { 0 };
-    strcat( touchCmd, "touch " );
-    strcat( touchCmd, dir );
-    strcat( touchCmd, "/" );
-    strcat( touchCmd, file );
-
-    system( mkdirCmd );
-	system( touchCmd );
+    system(mkdirCmd);
+	system(touchCmd);
 }
 
 void ListFilesRecursively(ListNode_t *head, char *basePath)
@@ -205,30 +264,36 @@ void ListFilesRecursively(ListNode_t *head, char *basePath)
     char path[1000];
     struct dirent *dp;
     DIR *dir = opendir(basePath);
+    int empty = 1;
 
     // Unable to open directory stream
     if (!dir) return;
 
-    while ((dp = readdir(dir)) != NULL)
-    {
-		if (dp->d_type != DT_DIR)
-		{
+	while ((dp = readdir(dir)) != NULL) {
+		
+        if (dp->d_type == DT_DIR) {
+            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+                continue;
+			empty = 0;
 			strcpy(path, basePath);
-            strcat(path, "/");
-            strcat(path, dp->d_name);
+			strcat(path, "/");
+			strcat(path, dp->d_name);
+            ListFilesRecursively(head, path);
+        } 
+		else 
+		{
+			empty = 0;
+            strcpy(path, basePath);
+			strcat(path, "/");
+			strcat(path, dp->d_name);
 			ListAdd(head, path);
 		}
-	
-        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0)
-        {
-            // printf("%s/%s\n", basePath, dp->d_name);
-            strcpy(path, basePath);
-            strcat(path, "/");
-            strcat(path, dp->d_name);
-
-			ListFilesRecursively(head, path);
-        }
     }
+
+	if(empty)
+	{
+		ListAdd(head, basePath);
+	}
 
     closedir(dir);
 }
@@ -301,4 +366,17 @@ int ValidateIpAddress(char *ipAddress)
    }
    
    return 1;
+}
+
+int LastSlashIndex(char *str)
+{
+    for (int i = strlen(str) - 1; i >= 0; i--)
+    {
+        if (str[i] == '/')
+        {
+            return i;
+        }
+    }
+
+    return -1;
 }

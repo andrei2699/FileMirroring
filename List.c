@@ -11,6 +11,7 @@ void InitList(ListNode_t *head)
 void ListAdd(ListNode_t *head, char *value)
 {
     if(strcmp(value, "") == 0) return;
+    // if(ListSearch(head, value)) return;
 
     ListNode_t * current = head;
     while (current->next != NULL) {
@@ -39,6 +40,21 @@ int ListSearch(ListNode_t *head, char *value)
     ListNode_t *current = head;
     while (current != NULL) {
         if (strcmp(current->value, value) == 0)
+        {
+            return 1;
+        }
+            
+        current = current->next;
+    }
+
+    return 0;
+}
+
+int ListContains(ListNode_t *head, char *value)
+{
+    ListNode_t *current = head;
+    while (current != NULL) {
+        if (strstr(current->value, value) != NULL)
             return 1;
             
         current = current->next;
@@ -50,7 +66,7 @@ int ListSearch(ListNode_t *head, char *value)
 int ListRemove(ListNode_t *head, char *value)
 {
     ListNode_t *current = head, *prev;
-    while (current != NULL && current->value != value) {
+    while (current != NULL && strcmp(current->value, value) != 0) {
         prev = current;
         current = current->next;
     }
@@ -59,6 +75,7 @@ int ListRemove(ListNode_t *head, char *value)
         return -1;
 
     prev->next = current->next;
+    free(current->value);
     free(current);
 
     return 1;
@@ -76,12 +93,10 @@ int ListIsEmpty(ListNode_t *head)
 
 void FreeList(ListNode_t *head)
 {
-    if (ListIsEmpty(head))
+    if(head != NULL)
     {
+        FreeList(head->next);
+        free(head->value);
         free(head);
-    }
-    else
-    {
-        printf("List is not empty\n");
     }
 }
